@@ -28,7 +28,19 @@ struct Camera {
 
     double _lastx, _lasty;
 
-    void updateControls(double dt) { // ! bad
+    bool firstMouse = true;
+
+    void resetMouse() {
+        firstMouse = true;
+    }
+
+    void updateControls(double dt) {
+        if (firstMouse) {
+            _lastx = Input::GetMouseX();
+            _lasty = Input::GetMouseY();
+            firstMouse = false;
+        }
+
         // mouse
         double xoffset = Input::GetMouseX() - _lastx;
         double yoffset = Input::GetMouseY() - _lasty;

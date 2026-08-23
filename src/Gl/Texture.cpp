@@ -1,4 +1,6 @@
 #include "Texture.hpp"
+#include <algorithm>
+
 
 namespace Gl {
 

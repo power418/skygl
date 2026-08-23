@@ -10,7 +10,7 @@ namespace Input {
     bool g_leftMouseDown = false;
     bool g_rightMouseDown = false;
     bool g_middleMouseDown = false;
-    bool g_cursorVisible = true;
+    bool g_cursorVisible = false;
     bool g_windowMinimized = false;
     bool g_windowFocused = true;
     std::string g_textBuffer;
@@ -20,6 +20,10 @@ namespace Input {
 
     void Init() {
         if (!Gl::window) return;
+        glfwSetInputMode(Gl::window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        if (glfwRawMouseMotionSupported()) {
+            glfwSetInputMode(Gl::window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+        }
         glfwSetScrollCallback(Gl::window, ScrollCallback);
         glfwSetWindowIconifyCallback(Gl::window, IconifyCallback);
         glfwSetWindowFocusCallback(Gl::window, FocusCallback);
@@ -49,11 +53,14 @@ namespace Input {
     }
 
     void ToggleCursor() {
-        g_cursorVisible = !g_cursorVisible;
+        SetCursorVisible(!g_cursorVisible);
     }
 
     void SetCursorVisible(bool visible) {
         g_cursorVisible = visible;
+        if (Gl::window) {
+            glfwSetInputMode(Gl::window, GLFW_CURSOR, g_cursorVisible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+        }
     }
 
     void SetWindowSize(int width, int height) {
@@ -98,9 +105,6 @@ namespace Input {
         g_textBuffer.clear();
 
         glfwPollEvents();
-
-        if (!g_cursorVisible) glfwSetInputMode(Gl::window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        else glfwSetInputMode(Gl::window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
         // Keyboard
         for (int i = 32; i < 349; i++) {

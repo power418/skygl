@@ -30,7 +30,7 @@
 
 Camera camera;
 float exposure = 0.0005f;
-float gamma = 2.2f;
+float gamma_val = 2.2f;
 float speed = 100.f / Sky::LenghtUnitInMeters;
 
 Sky::Atm::AtmosphereParameters atm_params = {
@@ -105,7 +105,7 @@ void DrawSettigs() {
     ImGui::SameLine();
     if (ImGui::Button("Storm")) sky.setWeather(Sky::WeatherType::Storm, 5);
 
-    ImGui::InputFloat("Gamma", &gamma);
+    ImGui::InputFloat("Gamma", &gamma_val);
     ImGui::InputFloat("Sens", &camera.sensitivity);
     if (ImGui::SliderFloat("FOV", &camera.fov, 55, 100, "%.1f")) camera.calcProjMat(render_width, render_height);
     ImGui::InputFloat("Exposure", &exposure, 0.00001, 0.0001, "%.5f");
@@ -177,7 +177,7 @@ void DrawSkyDebugInfo() {
                                         "{}\ntransitionDuration: {}\nisTransitioning: {}\nblendFactor: {}",
         debugInfo.dayTime, hour, minute, debugInfo.sunDirection.x, debugInfo.sunDirection.y, debugInfo.sunDirection.z,
         debugInfo.windSpeed * Sky::LenghtUnitInMeters, debugInfo.transitionDuration, debugInfo.isTransitioning, debugInfo.blendFactor);
-    ImGui::Text(formatted.c_str());
+    ImGui::Text("%s", formatted.c_str());
 
     ImGui::Image((ImTextureID)(intptr_t)debugInfo.currWeatherMapHandle, ImVec2(256, 256));
     ImGui::Image((ImTextureID)(intptr_t)debugInfo.nextWeatherMapHandle, ImVec2(256, 256));
@@ -222,27 +222,39 @@ void ClearPass() {
 }
 
 void ProcessKeys(double dt) {
-    if (Input::IsKeyPressed(Gl::Key::GraveAccent)) Input::ToggleCursor();
+    if (Input::IsKeyPressed(Gl::Key::LeftAlt) || Input::IsKeyPressed(Gl::Key::RightAlt) || Input::IsKeyPressed(Gl::Key::GraveAccent)) {
+        Input::ToggleCursor();
+        if (!Input::IsCursorVisible()) {
+            camera.resetMouse();
+        }
+    }
+
+    if (Input::IsCursorVisible() && Input::IsLeftMouseDown() && !ImGui::GetIO().WantCaptureMouse) {
+        Input::SetCursorVisible(false);
+        camera.resetMouse();
+    }
+
     if (Input::IsKeyPressed(Gl::Key::R)) HotReload();
 
-    // presets
+    // Only process camera movement when cursor is hidden (in world mode)
+    if (!Input::IsCursorVisible()) {
+        if (Input::IsKeyDown(Gl::Key::PageUp)) speed += 100 / Sky::LenghtUnitInMeters;
+        if (Input::IsKeyDown(Gl::Key::PageDown)) speed -= 100 / Sky::LenghtUnitInMeters;
 
-    if (Input::IsKeyDown(Gl::Key::PageUp)) speed += 100 / Sky::LenghtUnitInMeters;
-    if (Input::IsKeyDown(Gl::Key::PageDown)) speed -= 100 / Sky::LenghtUnitInMeters;
+        float speeddt = dt * speed;
+        if (Input::IsKeyDown(Gl::Key::LeftShift)) speeddt *= 10;
+        if (Input::IsKeyDown(Gl::Key::RightShift)) speeddt *= 100;
 
-    float speeddt = dt * speed;
-    if (Input::IsKeyDown(Gl::Key::LeftShift)) speeddt *= 10;
-    if (Input::IsKeyDown(Gl::Key::RightShift)) speeddt *= 100;
+        if (Input::IsKeyDown(Gl::Key::Space)) camera.position += camera.up * speeddt;
+        if (Input::IsKeyDown(Gl::Key::LeftControl)) camera.position -= camera.up * speeddt;
 
-    if (Input::IsKeyDown(Gl::Key::Space)) camera.position += camera.up * speeddt;
-    if (Input::IsKeyDown(Gl::Key::LeftControl)) camera.position -= camera.up * speeddt;
-
-    // WASD movement
-    if (Input::IsKeyDown(Gl::Key::W)) camera.position += camera.forward * speeddt;
-    if (Input::IsKeyDown(Gl::Key::S)) camera.position -= camera.forward * speeddt;
-    glm::vec3 right = glm::normalize(glm::cross(camera.forward, camera.up));
-    if (Input::IsKeyDown(Gl::Key::D)) camera.position += right * speeddt;
-    if (Input::IsKeyDown(Gl::Key::A)) camera.position -= right * speeddt;
+        // WASD movement
+        if (Input::IsKeyDown(Gl::Key::W)) camera.position += camera.forward * speeddt;
+        if (Input::IsKeyDown(Gl::Key::S)) camera.position -= camera.forward * speeddt;
+        glm::vec3 right = glm::normalize(glm::cross(camera.forward, camera.up));
+        if (Input::IsKeyDown(Gl::Key::D)) camera.position += right * speeddt;
+        if (Input::IsKeyDown(Gl::Key::A)) camera.position -= right * speeddt;
+    }
 }
 
 void LoadIcon(const std::string& path) {
@@ -307,6 +319,8 @@ int main() {
     float hundermeters = 100 / Sky::LenghtUnitInMeters;
     camera = Camera(hundermeters, 55, {0, hundermeters, 0});
     camera.calcProjMat(render_width, render_height);
+    camera.resetMouse();
+    Input::SetCursorVisible(false);
 
     double lastTime = glfwGetTime();
     while (!glfwWindowShouldClose(Gl::window)) {
@@ -337,7 +351,7 @@ int main() {
         if (!Input::IsCursorVisible()) camera.updateControls(dt);
         // -------------- render --------------
 
-        sky.render(camera, 0, gamma, exposure);
+        sky.render(camera, 0, gamma_val, exposure);
         // imgui
         DrawSkyDebugInfo();
         DrawMetrics(dt);
@@ -347,7 +361,6 @@ int main() {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(Gl::window);
-        glfwPollEvents();
     }
 
     ImGui_ImplOpenGL3_Shutdown();
